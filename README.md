@@ -17,3 +17,7 @@
 -R  Automatically pic random MAC for your interface
 -i  Interface
 ```
+
+```
+Windows version comming soon...
+```
