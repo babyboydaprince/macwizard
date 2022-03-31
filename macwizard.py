@@ -30,6 +30,8 @@ rparser.add_argument(
     '-s', '--show', help='Show available ifaces and exit script', action='store_true')
 parser.add_argument(
     '-R', '--Random', help='Generate a random MAC', action='store_true')
+parser.add_argument(
+    '-r', '--reset', help="Reset to Original MAC", action="store_true")
 
 args = parser.parse_args()
 
