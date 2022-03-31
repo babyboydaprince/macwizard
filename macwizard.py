@@ -1,8 +1,22 @@
+from pyfiglet import Figlet
+from termcolor import colored
 import parser
 import subprocess
 import string
 import random
 import re
+
+dona = """
+===================== Buy me a beer :) ==================
+==== BTC: bc1q8z64uky7jgwdsygc7fwq97d4u8yfr8hj57s200 ====
+=========================================================
+"""
+f = Figlet(font='banner3-D')
+
+print(colored(f.renderText('Mac'), 'red'))
+print(colored(f.renderText('Wizard'), 'green'))
+
+print(dona)
 
 
 def randomize():
