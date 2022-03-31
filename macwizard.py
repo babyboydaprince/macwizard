@@ -77,3 +77,5 @@ if __name__ == "__main__":
     # chack if mac was changes
     new_mac = get_mac(iface)
     print("[+] New MAC address: ", new_mac)
+
+break
