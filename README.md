@@ -2,11 +2,11 @@
 # Made by BraiNiac
 
 ```
-[Set Manually] python3 macchanger.py -i [interface] -m YY:YY:YY:YY:YY:YY
+[Set Manually] python3 macwizard.py -i [interface] -m YY:YY:YY:YY:YY:YY
 ```
 
 ```
-[Auto] python3 macchanger.py -i [interface] -R
+[Auto] python3 macwizard.py -i [interface] -R
 ```
 
 ```
