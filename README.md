@@ -16,7 +16,7 @@ Python script which changes the network interface mac address.
 
 ### 📋 Prerequisites
 
--> Python 3
+- Python 3
 
 
 ### 🔧 Installation
@@ -37,12 +37,12 @@ python macwizard.py -h
 
 ## 🛠️ Made with
 
--> Python 3.9.13
+- Python 3.9.13
 
 
 ## 📌 Macwizard version
 
--> 1.1
+- 1.1
 
 ---
 
