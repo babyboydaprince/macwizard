@@ -1,6 +1,6 @@
 # MAC WIZARD - mac changer made with python 3
 
-Python script which changes network interface mac address.
+Python script which changes the network interface mac address.
 
 ![alt text](https://github.com/babyboydaprince/macwizard/blob/main/img/logo.png?raw=true)
 
