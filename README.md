@@ -48,7 +48,7 @@ python macwizard.py -h
 
 ## 📌 Comming soon
 
--> Macwizard for Windows
+- Macwizard for Windows
 
 ---
 
