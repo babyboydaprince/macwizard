@@ -1,72 +1,188 @@
+import winreg
+import itertools
+import re
+import sys
+import argparse
 import subprocess
-import regex as re
-import string
-import random
+import ctypes
+
+REG_KEY_PATH_INTERFACES = r"SYSTEM\CurrentControlSet\Control\Class\{4d36e972-e325-11ce-bfc1-08002be10318}"
 
 
-# registry path of network interfaces
-network_interface_reg_path = r'HKEY_LOCAL_MACHINE\\SYSTEM\\' \
-    'CurrentControlSet\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}'
-# transport name regular expression, looks like
-# {AF1B45DB-B5D4-46D0-B4EA-3E18FA49BF5F}
-transport_name_regex = re.compile("{.+}")
-# MAC address regular expression
-mac_address_regex = re.compile(r"([A-Z0-9]{2}[:-]){5}([A-Z0-9]{2})")
-
-
-def get_random_mac():
-    """Generate and return a MAC address in WINDOWS format"""
-    # get the hexdigits in uppercase
-    upper_hexdigits = ''.join(set(string.hexdigits.upper()))
-    # 2nd character must be 2, 4, A, or E
-    return random.choice(upper_hexdigits) \
-        + random.choice("24AE") \
-        + "".join(random.sample(upper_hexdigits, k=10))
-
-
-def clean_mac(mac):
-    """ Function to clean non hexadecimal characters from a MAC address
-    mostly used to remove '-' and ':' from MAC addresses and return it
-    in uppercase"""
-    return "".join(c for c in mac if c in string.hexdigits).upper()
-
-
-def get_connected_adapters_mac_address():
-    # make a list to collect connected adapter's
-    # MAC addresses along with the transport name
-    connected_adapters_mac = []
-    # use the getmac command to extract
-    for potential_mac in subprocess.check_output(
-            "getmac").decode().splitlines():
-        # parse the MAC address from the line
-        mac_address = mac_address_regex.search(potential_mac)
-        # parse the transport name from the line
-        transport_name = transport_name_regex.search(potential_mac)
-        if mac_address and transport_name:
-            # if a MAC and transport name are found,
-            # add them to our list
-            connected_adapters_mac.append(
-                (mac_address.group(), transport_name.group()))
-    return connected_adapters_mac
-
-
-def get_user_adapter_choice(connected_adapters_mac):
-    # print the available adapters
-    for i, option in enumerate(connected_adapters_mac):
-        print(f"#{i}: {option[0]}, {option[1]}")
-    if len(connected_adapters_mac) <= 1:
-        # when there is only one adapter, choose it immediately
-        return connected_adapters_mac[0]
-    # prompt the user to choose a network adapter index
+def get_reg_value(name, reg_key_path):
     try:
-        choice = int(
-            input("Choose the interface you want to change the MAC address:"))
-        # return the target chosen adapter's
-        # MAC and transport name that we'll use later
-        # to search for our adapter using the reg QUERY command
-        return connected_adapters_mac[choice]
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_key_path) as registry_key:
+            value, regtype = winreg.QueryValueEx(registry_key, name)
+            return value
+    except OSError:
+        return None
+
+
+def set_reg_value(name, value, reg_key_path):
+    try:
+        with winreg.CreateKey(winreg.HKEY_LOCAL_MACHINE, reg_key_path):
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_key_path, 0, winreg.KEY_WRITE) as current_key:
+                winreg.SetValueEx(current_key, name, 0, winreg.REG_SZ, value)
+        return True
+    except OSError:
+        return False
+
+
+def del_reg_value(name, reg_key_path):
+    try:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_key_path, 0, winreg.KEY_WRITE) as registry_key:
+            winreg.DeleteValue(registry_key, name)
+            return True
+    except OSError:
+        return False
+
+
+def list_all_interfaces_guid():
+    try:
+        r = subprocess.run(["getmac", "/fo", "list", "/V"], capture_output=True)
+        print(r.stdout.decode('utf-8'))
+        return True
     except:
-        # if -for whatever reason- an error is raised,
-        # just quit the script
-        print("Not a valid choice, exiting...")
-        exit()
+        return False
+
+
+def san_mac(mac):
+    mac1 = re.sub('[^a-fA-F\d]', '', mac)
+    if len(mac1) != 12:
+        print("Invalid MAC supplied")
+        sys.exit()
+    return mac1
+
+
+def san_guid(net_cfg_instance_id):
+    m = re.search('[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}', net_cfg_instance_id)
+    if m:
+        return m.group(0)
+    else:
+        print("Invalid GUID supplied")
+        sys.exit()
+
+
+def set_mac_value(mac, guid):
+    guid = san_guid(guid)
+    guid = "{" + guid + "}"
+    mac = san_mac(mac)
+    try:
+        subkeys = []
+        # get the path names of all subkeys which are interfaces
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, REG_KEY_PATH_INTERFACES) as registry_key:
+            for i in itertools.count(start=0, step=1):
+                try:
+                    subkey_name = winreg.EnumKey(registry_key, i)
+                    if len(subkey_name) == 4:
+                        subkeys.append(subkey_name)
+                except OSError:
+                    break
+        # loop through all interfaces and check which is the correct to edit
+        for interface in subkeys:
+            tmp_path = REG_KEY_PATH_INTERFACES + "\\" + interface
+            net_cfg_instance_id = get_reg_value("NetCfgInstanceId", tmp_path)
+            if net_cfg_instance_id == guid:
+                if set_reg_value("NetworkAddress", mac, tmp_path):
+                    print("MAC of " + str(guid) + " changed to " + str(mac))
+                    return True
+                else:
+                    return False
+        return False
+    except OSError:
+        return None
+
+
+def restart_network_interface(guid):
+    guid = san_guid(guid)
+    # parse interface name out of guid
+    r = subprocess.run(["getmac", "/fo", "csv", "/V"], capture_output=True).stdout.decode('utf-8')
+    r = r.split(",")
+    interface_name = ""
+    for i, j in enumerate(r):
+        if guid in j:
+            interface_name = r[i - 3].split("\r\n")[1]
+    if len(interface_name) == 0:
+        print("Could not find interface name, you need to restart the network interface on your own."
+              "\r\nUse this command:")
+        print('netsh interface set interface name="<insert interface name>" admin="enabled"')
+        sys.exit()
+    # trigger restart of networks interface
+    cmd1 = 'netsh interface set interface name=' + interface_name + ' admin="disabled"'
+    subprocess.run(cmd1)
+    cmd2 = 'netsh interface set interface name=' + interface_name + ' admin="enabled"'
+    subprocess.run(cmd2)
+
+
+def remove_mac_value(guid):
+    guid = san_guid(guid)
+    guid = "{" + guid + "}"
+    try:
+        subkeys = []
+        # get the path names of all subkeys which are interfaces
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, REG_KEY_PATH_INTERFACES) as registry_key:
+            for i in itertools.count(start=0, step=1):
+                try:
+                    subkey_name = winreg.EnumKey(registry_key, i)
+                    if len(subkey_name) == 4:
+                        subkeys.append(subkey_name)
+                except OSError:
+                    break
+        # loop through all interfaces and check which is the correct to remove
+        for interface in subkeys:
+            tmp_path = REG_KEY_PATH_INTERFACES + "\\" + interface
+            net_cfg_instance_id = get_reg_value("NetCfgInstanceId", tmp_path)
+            if net_cfg_instance_id == guid:
+                if del_reg_value("NetworkAddress", tmp_path):
+                    print("Resetted MAC of " + str(guid) + " to default.")
+                    return True
+                else:
+                    return False
+        return False
+    except OSError:
+        return None
+
+
+if __name__ == "__main__":
+    if not ctypes.windll.shell32.IsUserAnAdmin():
+        print("Program needs administrative privileges.")
+        sys.exit()
+
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
+                                     description='A small script to change MAC addresses in Windows',
+                                     epilog='Note:\nWiFi Connections might need a 02 as first octet, e.g. 02:xx:xx:xx:xx:xx'
+                                            '\n\nExample usage:\n'+sys.argv[0]+' -l'
+                                            '\n'+sys.argv[0]+' -i CA8D7884-4754-4E6D-B637-D411533ECBBA -m 00:0C:29:FE:8B:77'
+                                            '\n'+sys.argv[0]+' -i CA8D7884-4754-4E6D-B637-D411533ECBBA -m 00:0C:29:FE:8B:77 -f'
+                                            '\n'+sys.argv[0]+' -i CA8D7884-4754-4E6D-B637-D411533ECBBA -r'
+                                            '\n'+sys.argv[0]+' -i CA8D7884-4754-4E6D-B637-D411533ECBBA -f'
+                                            '\n'+sys.argv[0]+' -i CA8D7884-4754-4E6D-B637-D411533ECBBA -r -f')
+    parser.add_argument("-l", "--list", action="store_true", help="list all network interfaces")
+    parser.add_argument("-r", "--reset", action="store_true",
+                        help="reset MAC address of the provided network interface to default")
+    parser.add_argument('-i', "--interface", action='store',
+                        help='provide an interface GUID (part of the "Transport Name"),'
+                             ' e.g. CA8D7884-4754-4E6D-B637-D411533ECBBA')
+    parser.add_argument('-m', "--mac", action='store', help='provide a valid MAC address, e.g. 00:0C:29:FE:8B:77. Might need 02 as the first octet for Wifi.')
+    parser.add_argument("-f", "--force", action="store_true", help="force restart network interface")
+
+    args = parser.parse_args()
+
+    if args.list:
+        list_all_interfaces_guid()
+    elif args.mac and args.interface and args.force:
+        set_mac_value(args.mac, args.interface)
+        restart_network_interface(args.interface)
+    elif args.mac and args.interface:
+        set_mac_value(args.mac, args.interface)
+        print("You might need to restart your network interface to complete the MAC change. Use -i and -f for that")
+    elif args.reset and args.interface and args.force:
+        remove_mac_value(args.interface)
+        restart_network_interface(args.interface)
+    elif args.reset and args.interface:
+        remove_mac_value(args.interface)
+        print("You might need to restart your network interface to complete the MAC change back to the default MAC. Use -i and -f for that.")
+    elif args.force and args.interface:
+        restart_network_interface(args.interface)
+    else:
+        print("Invalid command, try -h or --help.")
