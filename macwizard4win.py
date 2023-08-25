@@ -71,9 +71,9 @@ def adapter_choice(adapters_mac):
 
         return adapters_mac[choice]
 
-    except Exception as e:
+    except Exception as err:
 
-        print('Not a valid choice, exiting MACWIZARD...', e)
+        print('Not a valid choice, exiting MACWIZARD...', err)
 
 
 # Change MAC of given adapter
@@ -148,11 +148,14 @@ args = parser.parse_args()
 randomize = args.randomize
 macaddress = args.macaddress
 
-parser.parse_args()
 
 """ MAIN RUNNER """
 if __name__ == "__main__":
     try:
+        if not macaddress or not randomize:
+            parser.print_help()
+            sys.exit(1)
+
         connected_adapters = connected_adapters_mac()
 
         old_mac_address, target_transport_name = (
