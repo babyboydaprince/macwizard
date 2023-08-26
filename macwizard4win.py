@@ -11,7 +11,7 @@ from termcolor import colored
 """BANNER"""
 
 f = Figlet(font='banner3-D')
-
+print('\n')
 print(colored(f.renderText('Mac'), 'red'))
 print(colored(f.renderText('Wizard'), 'green'))
 
@@ -152,19 +152,22 @@ macaddress = args.macaddress
 """ MAIN RUNNER """
 if __name__ == "__main__":
     try:
-        if not macaddress or not randomize:
-            parser.print_help()
-            sys.exit(1)
 
-        connected_adapters = connected_adapters_mac()
+        # if not macaddress or not randomize:
+        parser.print_help()
+        print("\n")
 
-        old_mac_address, target_transport_name = (
-            adapter_choice(connected_adapters))
-        print("[*] Old MAC address:", old_mac_address)
+        choice_mode = input(f'Choose work mode: ')
 
-        if randomize:
+        if randomize == choice_mode:
 
             # Random
+            connected_adapters = connected_adapters_mac()
+
+            old_mac_address, target_transport_name = (
+                adapter_choice(connected_adapters))
+            print("[*] Old MAC address:", old_mac_address)
+
             new_mac_address = get_random_mac()
 
             adapter_index = change_mac(target_transport_name, new_mac_address)
@@ -178,7 +181,7 @@ if __name__ == "__main__":
             print("[+] Adapter is enabled again")
             print('Done.')
 
-        elif macaddress:
+        elif macaddress == choice_mode:
 
             # Set
             new_mac_address = clear_mac(macaddress)
