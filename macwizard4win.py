@@ -1,6 +1,5 @@
 # Created by BraiNiac
 import subprocess
-import sys
 import argparse
 import regex as re
 import string
@@ -130,7 +129,7 @@ def enable_adapter(adapter_index_en):
 
 # Set arguments
 parser = argparse.ArgumentParser(
-    description="-- MACWIZARD -- Python MAC Changer 4Win")
+    description="(( MACWIZARD )) Python MAC Changer 4Win")
 
 parser.add_argument(
     "-r",
@@ -148,57 +147,53 @@ args = parser.parse_args()
 randomize = args.randomize
 macaddress = args.macaddress
 
-
 """ MAIN RUNNER """
 if __name__ == "__main__":
-    try:
 
-        # if not macaddress or not randomize:
-        parser.print_help()
-        print("\n")
+    parser.print_help()
+    print("\n")
 
-        choice_mode = input(f'Choose work mode: ')
+    choice_arg = input('Choose working option: ')
 
-        if randomize == choice_mode:
+    connected_adapters = connected_adapters_mac()
 
-            # Random
-            connected_adapters = connected_adapters_mac()
+    old_mac_address, target_transport_name = (
+        adapter_choice(connected_adapters))
+    print("[*] Old MAC address:", old_mac_address)
 
-            old_mac_address, target_transport_name = (
-                adapter_choice(connected_adapters))
-            print("[*] Old MAC address:", old_mac_address)
+    print(choice_arg)
+    print(randomize)
 
-            new_mac_address = get_random_mac()
+    print(choice_arg == randomize)
 
-            adapter_index = change_mac(target_transport_name, new_mac_address)
-            print("[+] Changed to:", new_mac_address)
+    if choice_arg == '-r' or '--randomize':
 
-            disable_adapter(adapter_index)
+        # Random
+        new_mac_address = get_random_mac()
 
-            print("[+] Adapter is disabled")
+        adapter_index = change_mac(target_transport_name, new_mac_address)
+        print("[+] Changed to:", new_mac_address)
 
-            enable_adapter(adapter_index)
-            print("[+] Adapter is enabled again")
-            print('Done.')
+        disable_adapter(adapter_index)
 
-        elif macaddress == choice_mode:
+        print("[+] Adapter is disabled")
 
-            # Set
-            new_mac_address = clear_mac(macaddress)
+        enable_adapter(adapter_index)
+        print("[+] Adapter is enabled again")
+        print('Done.')
 
-            adapter_index = change_mac(target_transport_name, new_mac_address)
-            print("[+] Changed to:", new_mac_address)
+    elif choice_arg == '-m' or '--macaddress':
 
-            disable_adapter(adapter_index)
+        # Set
+        new_mac_address = clear_mac(macaddress)
 
-            print("[+] Adapter is disabled")
+        adapter_index = change_mac(target_transport_name, new_mac_address)
+        print("[+] Changed to:", new_mac_address)
 
-            enable_adapter(adapter_index)
-            print("[+] Adapter is enabled again")
-            print('Done.')
+        disable_adapter(adapter_index)
 
-    except Exception as e:
+        print("[+] Adapter is disabled")
 
-        print('It must be some king of wizardry...\n', e)
-        parser.print_help()
-        sys.exit()
+        enable_adapter(adapter_index)
+        print("[+] Adapter is enabled again")
+        print('Done.')
